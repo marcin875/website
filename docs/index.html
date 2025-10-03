@@ -1,116 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Aircraft Lookup</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f0f4f8;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
-    .container {
-      background: white;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-      width: 400px;
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 20px;
-      color: #333;
-    }
-    input {
-      width: 100%;
-      padding: 10px;
-      margin-bottom: 15px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      font-size: 16px;
-    }
-    button {
-      width: 100%;
-      padding: 12px;
-      background-color: #0077cc;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #005fa3;
-    }
-    .result {
-      margin-top: 20px;
-      padding: 15px;
-      border-radius: 8px;
-      background: #f9f9f9;
-      border: 1px solid #ddd;
-    }
-    .error {
-      color: red;
-      font-weight: bold;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Aircraft Lookup</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #f0f4f8; display: flex; justify-content: center; align-items: center; height: 100vh; margin:0;}
+  .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 400px;}
+  h1 { text-align: center; margin-bottom: 20px; }
+  input, button { width: 100%; padding: 10px; margin-bottom: 15px; border-radius:6px; border:1px solid #ccc; font-size:16px;}
+  button { background:#0077cc; color:white; border:none; cursor:pointer;}
+  button:hover { background:#005fa3;}
+  .result { margin-top: 20px; padding: 15px; border-radius: 8px; background:#f9f9f9; border:1px solid #ddd; }
+  .error { color:red; font-weight:bold; }
+</style>
 </head>
 <body>
-  <div class="container">
-    <h1>Aircraft Lookup</h1>
-    <input type="text" id="apiKey" placeholder="Enter your AviationStack API key">
-    <input type="text" id="reg" placeholder="Enter Registration (e.g. SP-EXI)">
-    <button onclick="lookup()">Search</button>
-    <div id="output" class="result"></div>
-  </div>
+<div class="container">
+  <h1>Aircraft Lookup</h1>
+  <input type="text" id="reg" placeholder="Enter Registration (e.g., SP-EXI)">
+  <button onclick="lookup()">Search</button>
+  <div id="output" class="result"></div>
+</div>
 
-  <script>
-    async function lookup() {
-      const key = document.getElementById("apiKey").value.trim();
-      const reg = document.getElementById("reg").value.trim().toUpperCase();
-      const output = document.getElementById("output");
+<script>
+async function lookup() {
+  const reg = document.getElementById("reg").value.trim().toUpperCase();
+  const output = document.getElementById("output");
+  output.innerHTML = "Searching…";
 
-      output.innerHTML = "Searching…";
+  if(!reg) {
+    output.innerHTML = "<span class='error'>Please enter a registration.</span>";
+    return;
+  }
 
-      if (!key) {
-        output.innerHTML = "<span class='error'>Please enter your API key.</span>";
-        return;
-      }
-      if (!reg) {
-        output.innerHTML = "<span class='error'>Please enter a registration.</span>";
-        return;
-      }
+  try {
+    const response = await fetch(`aircraft.php?reg=${reg}`);
+    const data = await response.json();
 
-      try {
-        const url = `https://api.aviationstack.com/v1/aircraft?access_key=${key}&registration=${reg}`;
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (!data.data || data.data.length === 0) {
-          output.innerHTML = "<span class='error'>Aircraft not found or invalid API key.</span>";
-          return;
-        }
-
-        const aircraft = data.data[0];
-        const deliveryDate = aircraft.delivery_date;
-        const age = deliveryDate ? ((Date.now() - new Date(deliveryDate)) / (365.25*24*60*60*1000)).toFixed(1) + " years" : "N/A";
-
-        output.innerHTML = `
-          <strong>Registration:</strong> ${reg}<br>
-          <strong>Type:</strong> ${aircraft.type || "N/A"}<br>
-          <strong>MSN:</strong> ${aircraft.msn || "N/A"}<br>
-          <strong>First Flight:</strong> ${aircraft.first_flight || "N/A"}<br>
-          <strong>Delivery Date:</strong> ${deliveryDate || "N/A"}<br>
-          <strong>Age:</strong> ${age}
-        `;
-      } catch (err) {
-        output.innerHTML = "<span class='error'>Error fetching data. Check your API key and internet connection.</span>";
-      }
+    if(data.error) {
+      output.innerHTML = `<span class='error'>${data.error}</span>`;
+      return;
     }
-  </script>
+
+    if(!data.data || data.data.length === 0) {
+      output.innerHTML = "<span class='error'>Aircraft not found.</span>";
+      return;
+    }
+
+    const aircraft = data.data[0];
+    const deliveryDate = aircraft.delivery_date;
+    const age = deliveryDate ? ((Date.now() - new Date(deliveryDate)) / (365.25*24*60*60*1000)).toFixed(1)+" years" : "N/A";
+
+    output.innerHTML = `
+      <strong>Registration:</strong> ${reg}<br>
+      <strong>Type:</strong> ${aircraft.type || "N/A"}<br>
+      <strong>MSN:</strong> ${aircraft.msn || "N/A"}<br>
+      <strong>First Flight:</strong> ${aircraft.first_flight || "N/A"}<br>
+      <strong>Delivery Date:</strong> ${deliveryDate || "N/A"}<br>
+      <strong>Age:</strong> ${age}
+    `;
+
+  } catch(err) {
+    output.innerHTML = "<span class='error'>Error fetching data. Check server or API key.</span>";
+  }
+}
+</script>
 </body>
 </html>
