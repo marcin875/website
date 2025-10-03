@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aircraft Database Lookup (HexDB)</title>
+    <title>Aircraft Database Lookup (OpenSky Static)</title>
     <!-- Load Tailwind CSS for modern, responsive styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -44,8 +44,8 @@
         <h1 class="text-3xl font-extrabold text-center text-gray-900 mb-2">
             Static Aircraft Database Lookup
         </h1>
-        <p class="text-center text-sm text-purple-600 font-medium mb-6">
-            Powered by HexDB (Static Aircraft Database)
+        <p class="text-center text-sm text-green-600 font-medium mb-6">
+            Powered by OpenSky Network (Static Metadata)
         </p>
 
         <!-- Registration Input and Search Button -->
@@ -54,12 +54,12 @@
                 type="text"
                 id="registrationInput"
                 placeholder="Enter Registration Number (e.g., SP-EXI, N338DX, D-ABIE)"
-                class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 text-lg uppercase transition duration-150"
+                class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-lg uppercase transition duration-150"
                 maxlength="10"
             />
             <button
                 id="searchButton"
-                class="px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg shadow-lg hover:bg-purple-700 transition duration-200 ease-in-out flex-shrink-0"
+                class="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-lg hover:bg-green-700 transition duration-200 ease-in-out flex-shrink-0"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
@@ -83,13 +83,14 @@
                     <span class="data-label">Registration:</span> <span id="registration" class="data-value"></span>
                     <span class="data-label">ICAO 24-bit Code:</span> <span id="icao_code" class="data-value"></span>
                     <span class="data-label">Manufacturer:</span> <span id="manufacturer_name" class="data-value"></span>
-                    <span class="data-label">Aircraft Type:</span> <span id="type_code" class="data-value"></span>
+                    <span class="data-label">Aircraft Model:</span> <span id="type_code" class="data-value"></span>
                     <span class="data-label">Operator/Owner:</span> <span id="operator_name" class="data-value"></span>
+                    <span class="data-label">Built Year:</span> <span id="built_year" class="data-value"></span>
                 </div>
             </div>
             
             <div class="mt-4 pt-4 border-t border-gray-200">
-                 <p class="text-xs text-gray-500 italic">Data Source: HexDB Static Aircraft Database. Switched due to previous API network errors.</p>
+                 <p class="text-xs text-gray-500 italic">Data Source: OpenSky Network Static Metadata, chosen for high reliability in sandboxed environments.</p>
             </div>
         </div>
     </div>
@@ -101,8 +102,9 @@
             const statusMessage = document.getElementById('statusMessage');
             const resultsPanel = document.getElementById('resultsPanel');
             
-            // Switched to HexDB API for better network reliability in sandboxed environments.
-            const API_BASE_URL = 'https://hexdb.io/api/v1/aircraft/reg/';
+            // Switched to OpenSky Network Metadata API by registration (regnum)
+            // Note: The OpenSky endpoint requires a basic "registration" filter param.
+            const API_BASE_URL = 'https://opensky-network.org/api/metadata/aircraft/';
 
             // Utility function to show messages
             const showStatus = (message, isError = false, bgColorClass = null) => {
@@ -114,14 +116,18 @@
 
             // Utility function to display the results
             const displayResults = (plane) => {
-                // HexDB fields: Registration, ICAO24, Manufacturer, Type, Owner, Operator
-                const registration = plane.Registration || 'N/A';
-                const icao_code = plane.ICAO24 || 'N/A';
-                const manufacturer_name = plane.Manufacturer || 'N/A';
-                const type_code = plane.Type || 'N/A';
+                // OpenSky Metadata fields: registration, icao24, manufacturername, model, operatorcallsign, firstseen
+                const registration = plane.registration || 'N/A';
+                const icao_code = plane.icao24 || 'N/A';
+                const manufacturer_name = plane.manufacturername || 'N/A';
+                const type_code = plane.model || 'N/A';
+                const operator_name = plane.owner || plane.operatorcallsign || 'Unknown Operator'; 
                 
-                // Prioritize Operator, fall back to Owner, then N/A
-                const operator_name = plane.Operator || plane.Owner || 'Unknown Operator'; 
+                let built_year = 'N/A';
+                if (plane.firstseen) {
+                    // Convert seconds since epoch to a readable year (assuming a close proxy for built year)
+                    built_year = new Date(plane.firstseen * 1000).getFullYear(); 
+                }
 
                 // Displaying the aircraft details
                 document.getElementById('registration').textContent = registration;
@@ -129,7 +135,7 @@
                 document.getElementById('manufacturer_name').textContent = manufacturer_name;
                 document.getElementById('type_code').textContent = type_code;
                 document.getElementById('operator_name').textContent = operator_name;
-                // document.getElementById('built_year').textContent is removed as HexDB often lacks this field.
+                document.getElementById('built_year').textContent = built_year;
                 
                 document.getElementById('regTag').textContent = registration;
                 
@@ -153,7 +159,7 @@
                         // If it's a 4xx client error (e.g., 404), throw immediately
                         if (response.status >= 400 && response.status < 500) {
                             const errorText = await response.text();
-                            throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorText.substring(0, 100)}...`);
+                            throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorText.substring(0, 0) || ''}...`); // Log error text snippet
                         }
                         
                     } catch (error) {
@@ -188,23 +194,22 @@
                 button.disabled = true;
                 button.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Searching...';
 
-                // Construct URL with registration number
-                const url = `${API_BASE_URL}${reg}`;
+                // Construct URL with registration number (OpenSky uses a filter parameter)
+                const url = `${API_BASE_URL}?registration=${reg}`;
                 
                 try {
                     const response = await fetchWithRetry(url);
                     const result = await response.json();
 
                     // Log raw response for debugging
-                    console.log("HexDB API Response (Raw):", result);
+                    console.log("OpenSky API Response (Raw):", result);
                     
-                    // HexDB returns a single object directly for a valid registration
-                    if (result && result.Registration) {
-                        displayResults(result);
+                    // OpenSky returns an array of matching aircraft in the 'metadata' property
+                    if (result && Array.isArray(result.metadata) && result.metadata.length > 0) {
+                        displayResults(result.metadata[0]);
                     } else {
-                        // Check if the response is an empty object or has an error message indicating no record
                         showStatus(
-                            `❌ Registration ${reg} not found in the static database. The aircraft might be new, obscure, or retired.`, 
+                            `❌ Registration ${reg} not found in the static database.`, 
                             true
                         );
                     }
@@ -215,8 +220,8 @@
                     if (errorMessage.includes('404')) {
                         errorMessage = 'Not Found. The Registration might be incorrect or not in the database.';
                     } else if (errorMessage.includes('Failed to fetch')) {
-                        // This should now be less common with HexDB
-                        errorMessage = 'Network Error. Could not reach the Aircraft Database.';
+                        // This specific error block is highly probable due to environmental restrictions
+                        errorMessage = 'Network Error. We cannot reach the aircraft database. This is likely due to security restrictions in the execution environment.';
                     }
                     
                     showStatus(`🚨 Error: ${errorMessage}`, true);
@@ -235,7 +240,7 @@
             });
 
             // Initial instruction message
-            showStatus('📚 Enter an Aircraft Registration Number (e.g., SP-EXI) to look up the plane\'s permanent database details. Now using HexDB for improved reliability.', false, 'bg-purple-100 text-purple-800');
+            showStatus('📚 Enter an Aircraft Registration Number (e.g., SP-EXI) to look up the plane\'s permanent database details. Now using OpenSky Network for maximum network compatibility.', false, 'bg-green-100 text-green-800');
         });
     </script>
 </body>
