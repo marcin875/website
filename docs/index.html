@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Aircraft Lookup with Custom API Key</title>
+  <title>Aircraft Lookup</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 30px; }
     .result { margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
@@ -10,51 +10,42 @@
 </head>
 <body>
   <h1>Aircraft Lookup</h1>
-  
-  <input type="text" id="apiKey" placeholder="Enter your AviationStack API key"><br><br>
-  <input type="text" id="reg" placeholder="Enter Registration (e.g. SP-EXI)">
+  <input type="text" id="reg" placeholder="Enter Registration (e.g., SP-EXI)">
   <button onclick="lookup()">Search</button>
 
   <div id="output" class="result"></div>
 
   <script>
     async function lookup() {
-      const key = document.getElementById("apiKey").value.trim();
       const reg = document.getElementById("reg").value.trim().toUpperCase();
       const output = document.getElementById("output");
 
-      if (!key) {
-        output.innerHTML = "Please enter your API key.";
-        return;
-      }
       if (!reg) {
         output.innerHTML = "Please enter a registration.";
         return;
       }
 
       try {
-        const response = await fetch(`https://api.aviationstack.com/v1/aircraft?access_key=${key}&registration=${reg}`);
+        const response = await fetch(`https://opensky-network.org/api/states/all`);
         const data = await response.json();
 
-        if (!data.data || data.data.length === 0) {
-          output.innerHTML = "Aircraft not found or invalid API key.";
-          return;
+        const aircraft = data.states.find(state => state[1] === reg);
+
+        if (aircraft) {
+          output.innerHTML = `
+            <strong>Registration:</strong> ${aircraft[1]}<br>
+            <strong>ICAO24:</strong> ${aircraft[0]}<br>
+            <strong>Origin Country:</strong> ${aircraft[2]}<br>
+            <strong>Velocity:</strong> ${aircraft[6]} m/s<br>
+            <strong>Altitude:</strong> ${aircraft[13]} meters<br>
+            <strong>Longitude:</strong> ${aircraft[5]}<br>
+            <strong>Latitude:</strong> ${aircraft[6]}
+          `;
+        } else {
+          output.innerHTML = "Aircraft not found.";
         }
-
-        const aircraft = data.data[0];
-        const deliveryDate = aircraft.delivery_date;
-        const age = deliveryDate ? ((Date.now() - new Date(deliveryDate)) / (365.25 * 24 * 60 * 60 * 1000)).toFixed(1) : "N/A";
-
-        output.innerHTML = `
-          <strong>Registration:</strong> ${reg}<br>
-          <strong>Type:</strong> ${aircraft.type || "N/A"}<br>
-          <strong>MSN:</strong> ${aircraft.msn || "N/A"}<br>
-          <strong>First Flight:</strong> ${aircraft.first_flight || "N/A"}<br>
-          <strong>Delivery Date:</strong> ${deliveryDate || "N/A"}<br>
-          <strong>Age:</strong> ${age} years
-        `;
       } catch (err) {
-        output.innerHTML = "Error fetching data. Make sure your API key is correct.";
+        output.innerHTML = "Error fetching data.";
       }
     }
   </script>
