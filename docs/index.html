@@ -1,215 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Aircraft Database Lookup</title>
-    <!-- Load Tailwind CSS for modern, responsive styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Custom font and base styling */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f7f9fb;
-        }
-        .container-card {
-            background-color: white;
-            border-radius: 1.5rem;
-            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15);
-        }
-        .data-label {
-            font-weight: 600;
-            color: #4b5563; /* Gray-600 */
-        }
-        .data-value {
-            color: #1f2937; /* Gray-800 */
-            word-break: break-word;
-        }
-        .data-grid {
-            display: grid;
-            grid-template-columns: 1fr 2fr;
-            gap: 0.5rem 1rem;
-            align-items: center;
-        }
-        @media (max-width: 640px) {
-             .data-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Aircraft Lookup with Custom API Key</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 30px; }
+    .result { margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+  </style>
 </head>
-<body class="p-4 sm:p-8 min-h-screen flex items-start justify-center">
+<body>
+  <h1>Aircraft Lookup</h1>
+  
+  <input type="text" id="apiKey" placeholder="Enter your AviationStack API key"><br><br>
+  <input type="text" id="reg" placeholder="Enter Registration (e.g. SP-EXI)">
+  <button onclick="lookup()">Search</button>
 
-    <div class="w-full max-w-xl">
-        <h1 class="text-3xl font-extrabold text-center text-gray-900 mb-2">
-            Static Aircraft Database Lookup
-        </h1>
-        <p class="text-center text-sm text-green-600 font-medium mb-6">
-            *** LIVE ONLINE: Using OpenSky Network API ***
-        </p>
+  <div id="output" class="result"></div>
 
-        <!-- Registration Input and Search Button -->
-        <div class="container-card p-6 flex flex-col sm:flex-row gap-3 mb-8">
-            <input
-                type="text"
-                id="registrationInput"
-                placeholder="Enter Registration Number (e.g., SP-EXI, N338DX, A6-EOT)"
-                class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-lg uppercase transition duration-150"
-                maxlength="10"
-            />
-            <button
-                id="searchButton"
-                class="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-lg hover:bg-green-700 transition duration-200 ease-in-out flex-shrink-0"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-                </svg>
-                Lookup Plane
-            </button>
-        </div>
+  <script>
+    async function lookup() {
+      const key = document.getElementById("apiKey").value.trim();
+      const reg = document.getElementById("reg").value.trim().toUpperCase();
+      const output = document.getElementById("output");
 
-        <!-- Loading, Error, and Results Area -->
-        <div id="statusMessage" class="mt-4 p-4 text-center font-medium bg-yellow-100 text-yellow-800 rounded-lg hidden"></div>
+      if (!key) {
+        output.innerHTML = "Please enter your API key.";
+        return;
+      }
+      if (!reg) {
+        output.innerHTML = "Please enter a registration.";
+        return;
+      }
 
-        <div id="resultsPanel" class="container-card p-6 hidden">
-            <h2 class="text-2xl font-bold text-gray-900 mb-4 border-b pb-2 flex justify-between items-center">
-                <span>Aircraft Static Details</span>
-                <span id="regTag" class="text-sm font-light px-3 py-1 bg-gray-100 rounded-full"></span>
-            </h2>
+      try {
+        const response = await fetch(`https://api.aviationstack.com/v1/aircraft?access_key=${key}&registration=${reg}`);
+        const data = await response.json();
 
-            <div class="space-y-3">
-                <!-- Data Display Grid -->
-                <div class="data-grid">
-                    <span class="data-label">Registration:</span> <span id="registration" class="data-value"></span>
-                    <span class="data-label">ICAO 24-bit Code:</span> <span id="icao_code" class="data-value"></span>
-                    <span class="data-label">Manufacturer:</span> <span id="manufacturer_name" class="data-value"></span>
-                    <span class="data-label">Aircraft Model:</span> <span id="type_code" class="data-value"></span>
-                    <span class="data-label">Operator/Owner:</span> <span id="operator_name" class="data-value"></span>
-                    <span class="data-label">Built Year:</span> <span id="built_year" class="data-value"></span>
-                </div>
-            </div>
-            
-            <div class="mt-4 pt-4 border-t border-gray-200">
-                 <p class="text-xs text-gray-500 italic">Data Source: Live OpenSky Network Static Metadata. Expected to fail due to environment network restrictions.</p>
-            </div>
-        </div>
-    </div>
+        if (!data.data || data.data.length === 0) {
+          output.innerHTML = "Aircraft not found or invalid API key.";
+          return;
+        }
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const regInput = document.getElementById('registrationInput');
-            const button = document.getElementById('searchButton');
-            const statusMessage = document.getElementById('statusMessage');
-            const resultsPanel = document.getElementById('resultsPanel');
-            
-            // Live OpenSky Network Static Metadata Endpoint
-            const API_BASE_URL = 'https://opensky-network.org/api/metadata/aircraft/';
+        const aircraft = data.data[0];
+        const deliveryDate = aircraft.delivery_date;
+        const age = deliveryDate ? ((Date.now() - new Date(deliveryDate)) / (365.25 * 24 * 60 * 60 * 1000)).toFixed(1) : "N/A";
 
-            // Utility function to show messages
-            const showStatus = (message, isError = false, bgColorClass = null) => {
-                const defaultBg = isError ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800';
-                statusMessage.textContent = message;
-                statusMessage.className = `mt-4 p-4 text-center font-medium rounded-lg ${bgColorClass || defaultBg}`;
-                statusMessage.classList.remove('hidden');
-            };
-
-            // Utility function to display the results
-            const displayResults = (plane) => {
-                const registration = plane.registration || 'N/A';
-                
-                // Displaying the aircraft details
-                document.getElementById('registration').textContent = registration;
-                document.getElementById('icao_code').textContent = (plane.icao24 || 'N/A').toUpperCase();
-                document.getElementById('manufacturer_name').textContent = plane.manufacturername || 'N/A';
-                document.getElementById('type_code').textContent = plane.model || 'N/A';
-                document.getElementById('operator_name').textContent = plane.owner || 'Unknown Operator'; 
-                
-                let built_year = plane.built_year || 'N/A';
-                if (built_year === 'N/A' && plane.firstseen) {
-                    built_year = new Date(plane.firstseen * 1000).getFullYear(); 
-                }
-                document.getElementById('built_year').textContent = built_year;
-                
-                document.getElementById('regTag').textContent = registration;
-                
-                statusMessage.classList.add('hidden');
-                resultsPanel.classList.remove('hidden');
-            };
-
-            // Main search function
-            const searchAircraft = async () => {
-                // Get registration and ensure it's clean and uppercase
-                const reg = regInput.value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, ''); 
-                
-                // Clear previous results and messages
-                resultsPanel.classList.add('hidden');
-                statusMessage.classList.add('hidden');
-                
-                if (!reg || reg.length < 2) {
-                    showStatus('⚠️ Please enter a valid Aircraft Registration Number (at least 2 characters).', true);
-                    return;
-                }
-                
-                button.disabled = true;
-                button.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Searching...';
-
-                const url = `${API_BASE_URL}?registration=${reg}`;
-                
-                try {
-                    // *** Direct Live Fetch ***
-                    const response = await fetch(url);
-
-                    if (!response.ok) {
-                         // Throw for non-network errors (e.g., 404, 500)
-                        throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
-                    }
-                    
-                    const result = await response.json();
-
-                    // OpenSky returns an array of matching aircraft in the 'metadata' property
-                    if (result && Array.isArray(result.metadata) && result.metadata.length > 0) {
-                        showStatus(`✅ Success: Live data found for ${reg}.`, false, 'bg-green-100 text-green-800 border border-green-400');
-                        displayResults(result.metadata[0]);
-                    } else {
-                        showStatus(
-                            `❌ Registration ${reg} not found in the live database.`, 
-                            true
-                        );
-                    }
-
-                } catch (error) {
-                    // This is the clean catch for the network block.
-                    let errorMessage;
-                    
-                    // Check for network errors (includes "Failed to fetch" and the "NetworkError" you were seeing)
-                    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                        console.error('Network Connection Blocked:', error);
-                        errorMessage = '🚨 LIVE API CONNECTION BLOCKED. This environment\'s security policy prevents external network requests. The code is working, but the connection is blocked.';
-                    } else if (error.message.includes('404')) {
-                        errorMessage = 'Not Found. The Registration might be incorrect or not in the live database.';
-                    } else {
-                        errorMessage = `An unexpected error occurred: ${error.message}`;
-                    }
-                    
-                    showStatus(`❌ ${errorMessage}`, true, 'bg-red-200 text-red-900 border border-red-400');
-
-                } finally {
-                    button.disabled = false;
-                    button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>Lookup Plane';
-                }
-            };
-
-            // Event Listeners
-            button.addEventListener('click', searchAircraft);
-            regInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    searchAircraft();
-                }
-            });
-
-            // Initial instruction message
-            showStatus('🚀 Ready. Enter an Aircraft Registration Number to attempt a live lookup.', false, 'bg-green-100 text-green-800');
-        });
-    </script>
+        output.innerHTML = `
+          <strong>Registration:</strong> ${reg}<br>
+          <strong>Type:</strong> ${aircraft.type || "N/A"}<br>
+          <strong>MSN:</strong> ${aircraft.msn || "N/A"}<br>
+          <strong>First Flight:</strong> ${aircraft.first_flight || "N/A"}<br>
+          <strong>Delivery Date:</strong> ${deliveryDate || "N/A"}<br>
+          <strong>Age:</strong> ${age} years
+        `;
+      } catch (err) {
+        output.innerHTML = "Error fetching data. Make sure your API key is correct.";
+      }
+    }
+  </script>
 </body>
 </html>
