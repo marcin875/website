@@ -172,8 +172,16 @@
                         if (error.message.startsWith('API Error')) {
                             throw error; // Re-throw client error immediately
                         }
-                        // This is the console log that appears for NetworkError during the retry loop
-                        console.error(`Attempt ${i + 1} failed with network error: NetworkError when attempting to fetch resource.`);
+                        
+                        // We are replacing the noisy console.error with a silent warning 
+                        // to prevent the log from appearing on every failed retry attempt due to a block.
+                        // *** FIX: Now checking for both "Failed to fetch" and "NetworkError" messages ***
+                        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                             console.warn(`Attempt ${i + 1} encountered a network block. Proceeding to retry or fail.`);
+                        } else {
+                            // Log unexpected errors
+                            console.error(`Attempt ${i + 1} failed with an unexpected error:`, error);
+                        }
                     }
                     
                     if (i < retries - 1) {
@@ -235,7 +243,7 @@
                     // This catch block only runs for registrations NOT in the fallback DB
                     let errorMessage = error.message;
 
-                    if (errorMessage.includes('Failed to fetch') || error.message.includes('Failed to fetch data after multiple retries')) {
+                    if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || error.message.includes('Failed to fetch data after multiple retries')) {
                         // Display the network error message for unknown registrations
                         errorMessage = 'Network Error. The connection was blocked. This is almost certainly due to the environment\'s security policy (CORS) preventing external API access.';
                     } else if (errorMessage.includes('404')) {
