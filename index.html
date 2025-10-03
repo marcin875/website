@@ -1,1 +1,257 @@
-<html></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Aircraft Registration Lookup (Live API)</title>
+    <!-- Load Tailwind CSS for modern, responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font and base styling */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+        .container-card {
+            background-color: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15);
+        }
+        .data-label {
+            font-weight: 600;
+            color: #4b5563; /* Gray-600 */
+        }
+        .data-value {
+            color: #1f2937; /* Gray-800 */
+            word-break: break-word;
+        }
+        .data-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 0.5rem 1rem;
+            align-items: center;
+        }
+        @media (max-width: 640px) {
+             .data-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 min-h-screen flex items-start justify-center">
+
+    <div class="w-full max-w-xl">
+        <h1 class="text-3xl font-extrabold text-center text-gray-900 mb-2">
+            Global Aircraft Lookup
+        </h1>
+        <p class="text-center text-sm text-blue-600 font-medium mb-6">
+            Powered by Aviationstack (Free API Key Required)
+        </p>
+
+        <!-- API Key Input -->
+        <div class="container-card p-4 mb-4">
+            <label for="apiKeyInput" class="block text-sm font-medium text-gray-700 mb-1">
+                Aviationstack API Key:
+            </label>
+            <input
+                type="text"
+                id="apiKeyInput"
+                placeholder="Paste your free API key here..."
+                class="w-full p-2 border border-yellow-400 bg-yellow-50 rounded-lg focus:ring-yellow-500 focus:border-yellow-500 text-sm"
+            />
+            <p class="text-xs text-gray-500 mt-1">
+                <a href="https://aviationstack.com/product/free-plan" target="_blank" class="text-blue-500 hover:text-blue-700 underline">
+                    Click here to get a free API Key (100 requests/mo).
+                </a>
+            </p>
+        </div>
+
+        <!-- Registration Input and Search Button -->
+        <div class="container-card p-6 flex flex-col sm:flex-row gap-3 mb-8">
+            <input
+                type="text"
+                id="registrationInput"
+                placeholder="Enter Registration (e.g., N338DX, SP-ENY, RA-73410)"
+                class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-lg uppercase transition duration-150"
+                maxlength="10"
+            />
+            <button
+                id="searchButton"
+                class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-700 transition duration-200 ease-in-out flex-shrink-0"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                </svg>
+                Search
+            </button>
+        </div>
+
+        <!-- Loading, Error, and Results Area -->
+        <div id="statusMessage" class="mt-4 p-4 text-center font-medium bg-yellow-100 text-yellow-800 rounded-lg hidden"></div>
+
+        <div id="resultsPanel" class="container-card p-6 hidden">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4 border-b pb-2 flex justify-between items-center">
+                <span>Aircraft Details</span>
+                <span id="countryTag" class="text-sm font-light px-3 py-1 bg-gray-100 rounded-full"></span>
+            </h2>
+
+            <div class="space-y-3">
+                <!-- Data Display Grid -->
+                <div class="data-grid">
+                    <span class="data-label">Registration:</span> <span id="reg" class="data-value"></span>
+                    <span class="data-label">ICAO 24-bit Code:</span> <span id="icao" class="data-value"></span>
+                    <span class="data-label">Manufacturer & Type:</span> <span id="model" class="data-value"></span>
+                    <span class="data-label">IATA Type:</span> <span id="iata" class="data-value"></span>
+                    <span class="data-label">Airline/Operator:</span> <span id="airline" class="data-value"></span>
+                    <span class="data-label">Owner Country:</span> <span id="country" class="data-value"></span>
+                    <span class="data-label">Status (Active/Inact.):</span> <span id="status" class="data-value"></span>
+                </div>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                 <p class="text-xs text-gray-500 italic">Data Source: Live Aviationstack API.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const apiKeyInput = document.getElementById('apiKeyInput');
+            const regInput = document.getElementById('registrationInput');
+            const button = document.getElementById('searchButton');
+            const statusMessage = document.getElementById('statusMessage');
+            const resultsPanel = document.getElementById('resultsPanel');
+            
+            // API Configuration
+            const API_BASE_URL = 'http://api.aviationstack.com/v1/aircraft';
+
+            // Utility function to show messages
+            const showStatus = (message, isError = false) => {
+                statusMessage.textContent = message;
+                statusMessage.className = `mt-4 p-4 text-center font-medium rounded-lg ${isError ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`;
+                statusMessage.classList.remove('hidden');
+                resultsPanel.classList.add('hidden');
+            };
+
+            // Utility function to display the results
+            const displayResults = (data) => {
+                const aircraft = data.data[0];
+                
+                document.getElementById('reg').textContent = aircraft.registration || 'N/A';
+                document.getElementById('icao').textContent = aircraft.icao_code || 'N/A';
+                document.getElementById('model').textContent = `${aircraft.manufacturer_name || 'N/A'} - ${aircraft.model_name || 'N/A'}`;
+                document.getElementById('iata').textContent = aircraft.iata_type || 'N/A';
+                document.getElementById('airline').textContent = aircraft.airline_name || 'N/A';
+                document.getElementById('country').textContent = aircraft.country_name || 'N/A';
+                
+                const status = aircraft.plane_status && aircraft.plane_status.toLowerCase() === 'active' ? '🟢 Active' : '🔴 Inactive/Unknown';
+                document.getElementById('status').textContent = status;
+                
+                document.getElementById('countryTag').textContent = aircraft.country_name || 'Global';
+
+                resultsPanel.classList.remove('hidden');
+                statusMessage.classList.add('hidden');
+            };
+
+            // Retry logic with Exponential Backoff (for transient network errors)
+            const fetchWithRetry = async (url, options = {}, retries = 3) => {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(url, options);
+                        if (response.ok) {
+                            return response;
+                        }
+                        // If it's a 4xx client error (e.g., 401, 404, 429), don't retry, just throw
+                        if (response.status >= 400 && response.status < 500) {
+                            throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                        }
+                        // For 5xx server errors, log and retry
+                        console.error(`Attempt ${i + 1} failed with status: ${response.status}`);
+                    } catch (error) {
+                        if (error.message.startsWith('API Error')) {
+                            throw error; // Re-throw client error immediately
+                        }
+                        console.error(`Attempt ${i + 1} failed:`, error.message);
+                    }
+                    
+                    if (i < retries - 1) {
+                        const delay = Math.pow(2, i) * 1000; // 1s, 2s, 4s delay
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+                throw new Error('Failed to fetch data after multiple retries.');
+            };
+
+            // Main search function
+            const searchAircraft = async () => {
+                const apiKey = apiKeyInput.value.trim();
+                const reg = regInput.value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, ''); // Clean up input
+                
+                // Clear previous results and messages
+                resultsPanel.classList.add('hidden');
+                statusMessage.classList.add('hidden');
+                
+                if (!apiKey) {
+                    showStatus('🛑 Please enter your Aviationstack API Key first.', true);
+                    return;
+                }
+
+                if (!reg) {
+                    showStatus('⚠️ Please enter an aircraft registration number (e.g., N338DX).', true);
+                    return;
+                }
+                
+                button.disabled = true;
+                button.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Searching...';
+
+                const url = `${API_BASE_URL}?access_key=${apiKey}&reg_number=${reg}`;
+                
+                try {
+                    const response = await fetchWithRetry(url);
+                    const result = await response.json();
+
+                    if (result.error) {
+                        throw new Error(result.error.message || `API Error Code: ${result.error.code}`);
+                    }
+
+                    if (result.data && result.data.length > 0) {
+                        displayResults(result);
+                    } else {
+                        showStatus(
+                            `❌ Aircraft registration ${reg} not found in the database.`, 
+                            true
+                        );
+                    }
+
+                } catch (error) {
+                    let errorMessage = error.message;
+
+                    if (errorMessage.includes('401')) {
+                        errorMessage = 'Invalid API Key. Please check your Aviationstack key.';
+                    } else if (errorMessage.includes('429')) {
+                         errorMessage = 'Rate Limit Exceeded. You have used up your 100 free monthly requests. Please wait or upgrade.';
+                    } else if (errorMessage.includes('Failed to fetch')) {
+                        errorMessage = 'Network Error. Could not reach the Aviationstack API.';
+                    }
+                    
+                    showStatus(`🚨 Error: ${errorMessage}`, true);
+                } finally {
+                    button.disabled = false;
+                    button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>Search';
+                }
+            };
+
+            // Event Listeners
+            button.addEventListener('click', searchAircraft);
+            regInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    searchAircraft();
+                }
+            });
+
+            // Initial instruction message
+            showStatus('👈 First, paste your free Aviationstack API key above. Then, enter a registration (e.g., N700AS, SP-ENY, RA-89099) and click Search to query live data.', false);
+        });
+    </script>
+</body>
+</html>
