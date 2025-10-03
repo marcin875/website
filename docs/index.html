@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Aircraft Registration Lookup (Live API)</title>
+    <title>Aircraft Database Lookup (HexDB)</title>
     <!-- Load Tailwind CSS for modern, responsive styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -42,47 +42,29 @@
 
     <div class="w-full max-w-xl">
         <h1 class="text-3xl font-extrabold text-center text-gray-900 mb-2">
-            Global Aircraft Lookup
+            Static Aircraft Database Lookup
         </h1>
-        <p class="text-center text-sm text-blue-600 font-medium mb-6">
-            Powered by Aviationstack (Free API Key Required)
+        <p class="text-center text-sm text-purple-600 font-medium mb-6">
+            Powered by HexDB (Static Aircraft Database)
         </p>
-
-        <!-- API Key Input -->
-        <div class="container-card p-4 mb-4">
-            <label for="apiKeyInput" class="block text-sm font-medium text-gray-700 mb-1">
-                Aviationstack API Key:
-            </label>
-            <input
-                type="text"
-                id="apiKeyInput"
-                placeholder="Paste your free API key here..."
-                class="w-full p-2 border border-yellow-400 bg-yellow-50 rounded-lg focus:ring-yellow-500 focus:border-yellow-500 text-sm"
-            />
-            <p class="text-xs text-gray-500 mt-1">
-                <a href="https://aviationstack.com/product/free-plan" target="_blank" class="text-blue-500 hover:text-blue-700 underline">
-                    Click here to get a free API Key (100 requests/mo).
-                </a>
-            </p>
-        </div>
 
         <!-- Registration Input and Search Button -->
         <div class="container-card p-6 flex flex-col sm:flex-row gap-3 mb-8">
             <input
                 type="text"
                 id="registrationInput"
-                placeholder="Enter Registration (e.g., N338DX, SP-ENY, RA-73410)"
-                class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-lg uppercase transition duration-150"
+                placeholder="Enter Registration Number (e.g., SP-EXI, N338DX, D-ABIE)"
+                class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 text-lg uppercase transition duration-150"
                 maxlength="10"
             />
             <button
                 id="searchButton"
-                class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-lg hover:bg-blue-700 transition duration-200 ease-in-out flex-shrink-0"
+                class="px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg shadow-lg hover:bg-purple-700 transition duration-200 ease-in-out flex-shrink-0"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
                 </svg>
-                Search
+                Lookup Plane
             </button>
         </div>
 
@@ -91,66 +73,68 @@
 
         <div id="resultsPanel" class="container-card p-6 hidden">
             <h2 class="text-2xl font-bold text-gray-900 mb-4 border-b pb-2 flex justify-between items-center">
-                <span>Aircraft Details</span>
-                <span id="countryTag" class="text-sm font-light px-3 py-1 bg-gray-100 rounded-full"></span>
+                <span>Aircraft Static Details</span>
+                <span id="regTag" class="text-sm font-light px-3 py-1 bg-gray-100 rounded-full"></span>
             </h2>
 
             <div class="space-y-3">
                 <!-- Data Display Grid -->
                 <div class="data-grid">
-                    <span class="data-label">Registration:</span> <span id="reg" class="data-value"></span>
-                    <span class="data-label">ICAO 24-bit Code:</span> <span id="icao" class="data-value"></span>
-                    <span class="data-label">Manufacturer & Type:</span> <span id="model" class="data-value"></span>
-                    <span class="data-label">IATA Type:</span> <span id="iata" class="data-value"></span>
-                    <span class="data-label">Airline/Operator:</span> <span id="airline" class="data-value"></span>
-                    <span class="data-label">Owner Country:</span> <span id="country" class="data-value"></span>
-                    <span class="data-label">Status (Active/Inact.):</span> <span id="status" class="data-value"></span>
+                    <span class="data-label">Registration:</span> <span id="registration" class="data-value"></span>
+                    <span class="data-label">ICAO 24-bit Code:</span> <span id="icao_code" class="data-value"></span>
+                    <span class="data-label">Manufacturer:</span> <span id="manufacturer_name" class="data-value"></span>
+                    <span class="data-label">Aircraft Type:</span> <span id="type_code" class="data-value"></span>
+                    <span class="data-label">Operator/Owner:</span> <span id="operator_name" class="data-value"></span>
                 </div>
             </div>
             
             <div class="mt-4 pt-4 border-t border-gray-200">
-                 <p class="text-xs text-gray-500 italic">Data Source: Live Aviationstack API.</p>
+                 <p class="text-xs text-gray-500 italic">Data Source: HexDB Static Aircraft Database. Switched due to previous API network errors.</p>
             </div>
         </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const apiKeyInput = document.getElementById('apiKeyInput');
             const regInput = document.getElementById('registrationInput');
             const button = document.getElementById('searchButton');
             const statusMessage = document.getElementById('statusMessage');
             const resultsPanel = document.getElementById('resultsPanel');
             
-            // API Configuration
-            const API_BASE_URL = 'http://api.aviationstack.com/v1/aircraft';
+            // Switched to HexDB API for better network reliability in sandboxed environments.
+            const API_BASE_URL = 'https://hexdb.io/api/v1/aircraft/reg/';
 
             // Utility function to show messages
-            const showStatus = (message, isError = false) => {
+            const showStatus = (message, isError = false, bgColorClass = null) => {
+                const defaultBg = isError ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800';
                 statusMessage.textContent = message;
-                statusMessage.className = `mt-4 p-4 text-center font-medium rounded-lg ${isError ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`;
+                statusMessage.className = `mt-4 p-4 text-center font-medium rounded-lg ${bgColorClass || defaultBg}`;
                 statusMessage.classList.remove('hidden');
-                resultsPanel.classList.add('hidden');
             };
 
             // Utility function to display the results
-            const displayResults = (data) => {
-                const aircraft = data.data[0];
+            const displayResults = (plane) => {
+                // HexDB fields: Registration, ICAO24, Manufacturer, Type, Owner, Operator
+                const registration = plane.Registration || 'N/A';
+                const icao_code = plane.ICAO24 || 'N/A';
+                const manufacturer_name = plane.Manufacturer || 'N/A';
+                const type_code = plane.Type || 'N/A';
                 
-                document.getElementById('reg').textContent = aircraft.registration || 'N/A';
-                document.getElementById('icao').textContent = aircraft.icao_code || 'N/A';
-                document.getElementById('model').textContent = `${aircraft.manufacturer_name || 'N/A'} - ${aircraft.model_name || 'N/A'}`;
-                document.getElementById('iata').textContent = aircraft.iata_type || 'N/A';
-                document.getElementById('airline').textContent = aircraft.airline_name || 'N/A';
-                document.getElementById('country').textContent = aircraft.country_name || 'N/A';
-                
-                const status = aircraft.plane_status && aircraft.plane_status.toLowerCase() === 'active' ? '🟢 Active' : '🔴 Inactive/Unknown';
-                document.getElementById('status').textContent = status;
-                
-                document.getElementById('countryTag').textContent = aircraft.country_name || 'Global';
+                // Prioritize Operator, fall back to Owner, then N/A
+                const operator_name = plane.Operator || plane.Owner || 'Unknown Operator'; 
 
-                resultsPanel.classList.remove('hidden');
+                // Displaying the aircraft details
+                document.getElementById('registration').textContent = registration;
+                document.getElementById('icao_code').textContent = icao_code.toUpperCase();
+                document.getElementById('manufacturer_name').textContent = manufacturer_name;
+                document.getElementById('type_code').textContent = type_code;
+                document.getElementById('operator_name').textContent = operator_name;
+                // document.getElementById('built_year').textContent is removed as HexDB often lacks this field.
+                
+                document.getElementById('regTag').textContent = registration;
+                
                 statusMessage.classList.add('hidden');
+                resultsPanel.classList.remove('hidden');
             };
 
             // Retry logic with Exponential Backoff (for transient network errors)
@@ -158,20 +142,25 @@
                 for (let i = 0; i < retries; i++) {
                     try {
                         const response = await fetch(url, options);
+                        
                         if (response.ok) {
                             return response;
                         }
-                        // If it's a 4xx client error (e.g., 401, 404, 429), don't retry, just throw
+
+                        // Log non-ok responses before throwing
+                        console.error(`Attempt ${i + 1} failed with status: ${response.status} for URL: ${url}`);
+                        
+                        // If it's a 4xx client error (e.g., 404), throw immediately
                         if (response.status >= 400 && response.status < 500) {
-                            throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                            const errorText = await response.text();
+                            throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorText.substring(0, 100)}...`);
                         }
-                        // For 5xx server errors, log and retry
-                        console.error(`Attempt ${i + 1} failed with status: ${response.status}`);
+                        
                     } catch (error) {
                         if (error.message.startsWith('API Error')) {
                             throw error; // Re-throw client error immediately
                         }
-                        console.error(`Attempt ${i + 1} failed:`, error.message);
+                        console.error(`Attempt ${i + 1} failed with network error:`, error.message);
                     }
                     
                     if (i < retries - 1) {
@@ -184,41 +173,38 @@
 
             // Main search function
             const searchAircraft = async () => {
-                const apiKey = apiKeyInput.value.trim();
-                const reg = regInput.value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, ''); // Clean up input
+                // Get registration and ensure it's clean for the API query
+                const reg = regInput.value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, ''); 
                 
                 // Clear previous results and messages
                 resultsPanel.classList.add('hidden');
                 statusMessage.classList.add('hidden');
                 
-                if (!apiKey) {
-                    showStatus('🛑 Please enter your Aviationstack API Key first.', true);
-                    return;
-                }
-
-                if (!reg) {
-                    showStatus('⚠️ Please enter an aircraft registration number (e.g., N338DX).', true);
+                if (!reg || reg.length < 2) {
+                    showStatus('⚠️ Please enter a valid Aircraft Registration Number (at least 2 characters).', true);
                     return;
                 }
                 
                 button.disabled = true;
                 button.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Searching...';
 
-                const url = `${API_BASE_URL}?access_key=${apiKey}&reg_number=${reg}`;
+                // Construct URL with registration number
+                const url = `${API_BASE_URL}${reg}`;
                 
                 try {
                     const response = await fetchWithRetry(url);
                     const result = await response.json();
 
-                    if (result.error) {
-                        throw new Error(result.error.message || `API Error Code: ${result.error.code}`);
-                    }
-
-                    if (result.data && result.data.length > 0) {
+                    // Log raw response for debugging
+                    console.log("HexDB API Response (Raw):", result);
+                    
+                    // HexDB returns a single object directly for a valid registration
+                    if (result && result.Registration) {
                         displayResults(result);
                     } else {
+                        // Check if the response is an empty object or has an error message indicating no record
                         showStatus(
-                            `❌ Aircraft registration ${reg} not found in the database.`, 
+                            `❌ Registration ${reg} not found in the static database. The aircraft might be new, obscure, or retired.`, 
                             true
                         );
                     }
@@ -226,18 +212,17 @@
                 } catch (error) {
                     let errorMessage = error.message;
 
-                    if (errorMessage.includes('401')) {
-                        errorMessage = 'Invalid API Key. Please check your Aviationstack key.';
-                    } else if (errorMessage.includes('429')) {
-                         errorMessage = 'Rate Limit Exceeded. You have used up your 100 free monthly requests. Please wait or upgrade.';
+                    if (errorMessage.includes('404')) {
+                        errorMessage = 'Not Found. The Registration might be incorrect or not in the database.';
                     } else if (errorMessage.includes('Failed to fetch')) {
-                        errorMessage = 'Network Error. Could not reach the Aviationstack API.';
+                        // This should now be less common with HexDB
+                        errorMessage = 'Network Error. Could not reach the Aircraft Database.';
                     }
                     
                     showStatus(`🚨 Error: ${errorMessage}`, true);
                 } finally {
                     button.disabled = false;
-                    button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>Search';
+                    button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>Lookup Plane';
                 }
             };
 
@@ -250,7 +235,7 @@
             });
 
             // Initial instruction message
-            showStatus('👈 First, paste your free Aviationstack API key above. Then, enter a registration (e.g., N700AS, SP-ENY, RA-89099) and click Search to query live data.', false);
+            showStatus('📚 Enter an Aircraft Registration Number (e.g., SP-EXI) to look up the plane\'s permanent database details. Now using HexDB for improved reliability.', false, 'bg-purple-100 text-purple-800');
         });
     </script>
 </body>
