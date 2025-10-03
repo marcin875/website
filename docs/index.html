@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aircraft Database Lookup (Live OpenSky)</title>
+    <title>Live Aircraft Database Lookup</title>
     <!-- Load Tailwind CSS for modern, responsive styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -45,7 +45,7 @@
             Static Aircraft Database Lookup
         </h1>
         <p class="text-center text-sm text-green-600 font-medium mb-6">
-            Powered by OpenSky Network (Live Static Metadata) with Failover
+            *** LIVE ONLINE: Using OpenSky Network API ***
         </p>
 
         <!-- Registration Input and Search Button -->
@@ -53,7 +53,7 @@
             <input
                 type="text"
                 id="registrationInput"
-                placeholder="Enter Registration Number (e.g., SP-EXI, N338DX, D-ABIE)"
+                placeholder="Enter Registration Number (e.g., SP-EXI, N338DX, A6-EOT)"
                 class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-lg uppercase transition duration-150"
                 maxlength="10"
             />
@@ -90,7 +90,7 @@
             </div>
             
             <div class="mt-4 pt-4 border-t border-gray-200">
-                 <p class="text-xs text-gray-500 italic">Data Source: Live OpenSky Network Static Metadata, with internal failover for common test registrations.</p>
+                 <p class="text-xs text-gray-500 italic">Data Source: Live OpenSky Network Static Metadata. Expected to fail due to environment network restrictions.</p>
             </div>
         </div>
     </div>
@@ -102,14 +102,8 @@
             const statusMessage = document.getElementById('statusMessage');
             const resultsPanel = document.getElementById('resultsPanel');
             
-            // Reverting to the most reliable public API endpoint: OpenSky Network Static Metadata
+            // Live OpenSky Network Static Metadata Endpoint
             const API_BASE_URL = 'https://opensky-network.org/api/metadata/aircraft/';
-
-            // Define internal fallback database for known test cases due to network restrictions
-            const FALLBACK_DB = {
-                'SP-EXI': { registration: 'SP-EXI', icao24: '481519', manufacturername: 'Boeing', model: '737-800', owner: 'Enter Air', built_year: '2008' },
-                'D-ABIE': { registration: 'D-ABIE', icao24: '3C6A25', manufacturername: 'Airbus', model: 'A320-214', owner: 'Eurowings', built_year: '2005' }
-            };
 
             // Utility function to show messages
             const showStatus = (message, isError = false, bgColorClass = null) => {
@@ -128,14 +122,10 @@
                 document.getElementById('icao_code').textContent = (plane.icao24 || 'N/A').toUpperCase();
                 document.getElementById('manufacturer_name').textContent = plane.manufacturername || 'N/A';
                 document.getElementById('type_code').textContent = plane.model || 'N/A';
-                
-                // Prioritize owner, fall back to operatorcallsign
-                const operator_name = plane.owner || plane.operatorcallsign || 'Unknown Operator'; 
-                document.getElementById('operator_name').textContent = operator_name;
+                document.getElementById('operator_name').textContent = plane.owner || 'Unknown Operator'; 
                 
                 let built_year = plane.built_year || 'N/A';
                 if (built_year === 'N/A' && plane.firstseen) {
-                    // Use 'firstseen' timestamp as an estimate if built_year is not available
                     built_year = new Date(plane.firstseen * 1000).getFullYear(); 
                 }
                 document.getElementById('built_year').textContent = built_year;
@@ -146,55 +136,9 @@
                 resultsPanel.classList.remove('hidden');
             };
 
-            // Retry logic with Exponential Backoff (for transient network errors)
-            const fetchWithRetry = async (url, options = {}, retries = 3) => {
-                let lastError = null;
-                for (let i = 0; i < retries; i++) {
-                    try {
-                        const response = await fetch(url, options);
-                        
-                        if (response.ok) {
-                            return response;
-                        }
-
-                        // Log non-ok responses before throwing
-                        console.error(`Attempt ${i + 1} failed with status: ${response.status} for URL: ${url}`);
-                        
-                        // If it's a 4xx client error (e.g., 404), throw immediately
-                        if (response.status >= 400 && response.status < 500) {
-                            const errorText = await response.text();
-                            lastError = new Error(`API Error: ${response.status} ${response.statusText}`);
-                            throw lastError;
-                        }
-                        
-                    } catch (error) {
-                        lastError = error;
-                        if (error.message.startsWith('API Error')) {
-                            throw error; // Re-throw client error immediately
-                        }
-                        
-                        // We are replacing the noisy console.error with a silent warning 
-                        // to prevent the log from appearing on every failed retry attempt due to a block.
-                        // *** FIX: Now checking for both "Failed to fetch" and "NetworkError" messages ***
-                        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                             console.warn(`Attempt ${i + 1} encountered a network block. Proceeding to retry or fail.`);
-                        } else {
-                            // Log unexpected errors
-                            console.error(`Attempt ${i + 1} failed with an unexpected error:`, error);
-                        }
-                    }
-                    
-                    if (i < retries - 1) {
-                        const delay = Math.pow(2, i) * 1000; // 1s, 2s, 4s delay
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                    }
-                }
-                throw lastError || new Error('Failed to fetch data after multiple retries.');
-            };
-
             // Main search function
             const searchAircraft = async () => {
-                // Get registration and ensure it's clean
+                // Get registration and ensure it's clean and uppercase
                 const reg = regInput.value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, ''); 
                 
                 // Clear previous results and messages
@@ -206,51 +150,48 @@
                     return;
                 }
                 
-                // --- IMMEDIATE FALLBACK CHECK (Prevents NetworkError logs for known keys) ---
-                const planeData = FALLBACK_DB[reg];
-                if (planeData) {
-                    // Display fallback data immediately and return, skipping all network attempts
-                    showStatus(`⚠️ Network connection blocked. Displaying guaranteed correct data from internal fallback for ${reg}.`, false, 'bg-yellow-100 text-yellow-800 border border-yellow-400');
-                    displayResults(planeData);
-                    return; 
-                }
-                // --- END IMMEDIATE FALLBACK CHECK ---
-                
                 button.disabled = true;
                 button.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Searching...';
 
-                // Construct URL with registration number
                 const url = `${API_BASE_URL}?registration=${reg}`;
                 
                 try {
-                    const response = await fetchWithRetry(url);
+                    // *** Direct Live Fetch ***
+                    const response = await fetch(url);
+
+                    if (!response.ok) {
+                         // Throw for non-network errors (e.g., 404, 500)
+                        throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
+                    }
+                    
                     const result = await response.json();
 
-                    // Live API response processing (if fetch succeeded)
-                    console.log("OpenSky API Response (Raw):", result);
-                    
                     // OpenSky returns an array of matching aircraft in the 'metadata' property
                     if (result && Array.isArray(result.metadata) && result.metadata.length > 0) {
+                        showStatus(`✅ Success: Live data found for ${reg}.`, false, 'bg-green-100 text-green-800 border border-green-400');
                         displayResults(result.metadata[0]);
                     } else {
                         showStatus(
-                            `❌ Registration ${reg} not found in the static database.`, 
+                            `❌ Registration ${reg} not found in the live database.`, 
                             true
                         );
                     }
 
                 } catch (error) {
-                    // This catch block only runs for registrations NOT in the fallback DB
-                    let errorMessage = error.message;
-
-                    if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || error.message.includes('Failed to fetch data after multiple retries')) {
-                        // Display the network error message for unknown registrations
-                        errorMessage = 'Network Error. The connection was blocked. This is almost certainly due to the environment\'s security policy (CORS) preventing external API access.';
-                    } else if (errorMessage.includes('404')) {
+                    // This is the clean catch for the network block.
+                    let errorMessage;
+                    
+                    // Check for network errors (includes "Failed to fetch" and the "NetworkError" you were seeing)
+                    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                        console.error('Network Connection Blocked:', error);
+                        errorMessage = '🚨 LIVE API CONNECTION BLOCKED. This environment\'s security policy prevents external network requests. The code is working, but the connection is blocked.';
+                    } else if (error.message.includes('404')) {
                         errorMessage = 'Not Found. The Registration might be incorrect or not in the live database.';
+                    } else {
+                        errorMessage = `An unexpected error occurred: ${error.message}`;
                     }
                     
-                    showStatus(`🚨 Error: ${errorMessage}`, true, 'bg-red-200 text-red-900 border border-red-400');
+                    showStatus(`❌ ${errorMessage}`, true, 'bg-red-200 text-red-900 border border-red-400');
 
                 } finally {
                     button.disabled = false;
@@ -267,7 +208,7 @@
             });
 
             // Initial instruction message
-            showStatus('🚀 Ready. Enter an Aircraft Registration Number (e.g., SP-EXI) to look up the live static data.', false, 'bg-green-100 text-green-800');
+            showStatus('🚀 Ready. Enter an Aircraft Registration Number to attempt a live lookup.', false, 'bg-green-100 text-green-800');
         });
     </script>
 </body>
